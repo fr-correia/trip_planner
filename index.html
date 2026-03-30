@@ -39,13 +39,20 @@ body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif
 .login-box { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:2rem 2.2rem; width:90%; max-width:320px; box-shadow:0 8px 32px rgba(0,0,0,0.1); text-align:center; }
 .login-box h2 { font-family:'Playfair Display',serif; font-size:1.3rem; font-weight:400; color:var(--gold); margin-bottom:0.3rem; }
 .login-box p { font-size:0.68rem; color:var(--text-d); letter-spacing:0.06em; text-transform:uppercase; margin-bottom:1.4rem; }
-.login-box input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:0.9rem; padding:0.55rem 0.9rem; outline:none; text-align:center; letter-spacing:0.1em; transition:border-color 0.18s; margin-bottom:0.8rem; }
+.login-box input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:0.9rem; padding:0.55rem 0.9rem; outline:none; text-align:center; letter-spacing:0.05em; transition:border-color 0.18s; margin-bottom:0.7rem; }
 .login-box input:focus { border-color:var(--gold); }
 .login-box input.error { border-color:#c43020; animation:shake 0.3s ease; }
 .login-box button { width:100%; padding:0.55rem; background:var(--gold-bg); border:1px solid var(--gold); border-radius:6px; color:var(--gold); font-family:'DM Sans',sans-serif; font-size:0.76rem; font-weight:500; cursor:pointer; letter-spacing:0.06em; text-transform:uppercase; transition:background 0.18s; }
 .login-box button:hover { background:#f5e8c0; }
 .login-error { font-size:0.65rem; color:#c43020; margin-top:0.5rem; min-height:1rem; }
 @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+
+/* ── Presence indicators ── */
+.presence-wrap { display:flex; align-items:center; gap:0.6rem; }
+.presence-user { display:flex; align-items:center; gap:0.25rem; font-size:0.6rem; color:var(--text-d); letter-spacing:0.04em; }
+.presence-dot { width:6px; height:6px; border-radius:50%; background:#ccc; flex-shrink:0; transition:background 0.4s; }
+.presence-dot.online { background:#2a9e5e; }
+.presence-dot.offline { background:#ccc; }
 
 /* ── Header ── */
 header { padding:1.1rem 2rem 0.9rem; border-bottom:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.8rem; position:sticky; top:0; z-index:10; }
@@ -355,9 +362,10 @@ body.editing .insert-before-btn { display:block; }
 <div id="login-screen">
   <div class="login-box">
     <h2>Vietname &amp; Singapura</h2>
-    <p>Introduz a password para entrar</p>
-    <input type="password" id="login-input" placeholder="••••••••" autocomplete="current-password">
-    <button onclick="tryLogin()">Entrar</button>
+    <p>Entra com o teu nome e password</p>
+    <input type="text" id="login-user" placeholder="Nome" autocomplete="username" style="margin-bottom:0.5rem">
+    <input type="password" id="login-pw" placeholder="••••••••" autocomplete="current-password">
+    <button onclick="tryLogin()" style="margin-top:0.3rem">Entrar</button>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
@@ -397,6 +405,16 @@ body.editing .insert-before-btn { display:block; }
   </div>
 </header>
 
+<div class="presence-wrap" id="presence-wrap">
+  <div class="presence-user" id="pu-Francisco">
+    <div class="presence-dot offline" id="pd-Francisco"></div>
+    <span>Francisco</span>
+  </div>
+  <div class="presence-user" id="pu-Cátia">
+    <div class="presence-dot offline" id="pd-Cátia"></div>
+    <span>Cátia</span>
+  </div>
+</div>
 <div class="sync-status" id="sync-status" title="Estado da sincronização">
   <div class="sync-dot" id="sync-dot"></div>
   <span id="sync-label">A ligar…</span>
@@ -2077,35 +2095,121 @@ window.addEventListener('resize', initMobileLayout);
 window.addEventListener('load', function() { initMobileLayout(); initPinPositions(); });
 
 // Ensure DOM is ready before rendering (Safari sometimes needs this)
-// ── Login ─────────────────────────────────────────────────────────────────────
-var _PW = 'Sofia95';
-var _SESSION_KEY = 'vn_auth';
+// ── Auth & Presence ───────────────────────────────────────────────────────────
+var USERS = { 'Francisco': 'Sofia95', 'Cátia': 'Sofia95' };
+var ALL_USERS = ['Francisco', 'Cátia'];
+var _SESSION_USER = null;
+var _presenceInterval = null;
+var _HEARTBEAT_MS = 10000; // 10s heartbeat
+var _OFFLINE_AFTER_MS = 25000; // considered offline after 25s without heartbeat
 
 function checkLogin() {
-  try { return sessionStorage.getItem(_SESSION_KEY) === '1'; } catch(e) { return false; }
+  try {
+    var u = sessionStorage.getItem('vn_user');
+    if (u && USERS[u]) { _SESSION_USER = u; return true; }
+  } catch(e) {}
+  return false;
 }
 
 function tryLogin() {
-  var val = document.getElementById('login-input').value;
-  var inp = document.getElementById('login-input');
-  var err = document.getElementById('login-error');
-  if (val === _PW) {
-    try { sessionStorage.setItem(_SESSION_KEY, '1'); } catch(e) {}
+  var userVal = (document.getElementById('login-user').value || '').trim();
+  var pwVal   = document.getElementById('login-pw').value;
+  var err     = document.getElementById('login-error');
+  var pwInp   = document.getElementById('login-pw');
+  var uInp    = document.getElementById('login-user');
+
+  // Match user case-insensitively
+  var matchedUser = null;
+  ALL_USERS.forEach(function(u) {
+    if (u.toLowerCase() === userVal.toLowerCase()) matchedUser = u;
+  });
+
+  if (matchedUser && pwVal === USERS[matchedUser]) {
+    _SESSION_USER = matchedUser;
+    try { sessionStorage.setItem('vn_user', matchedUser); } catch(e) {}
     document.getElementById('login-screen').classList.add('hidden');
     initApp();
   } else {
-    err.textContent = 'Password incorrecta';
-    inp.classList.add('error');
-    inp.value = '';
-    setTimeout(function(){ inp.classList.remove('error'); err.textContent = ''; }, 1500);
-    inp.focus();
+    err.textContent = !matchedUser ? 'Nome não reconhecido' : 'Password incorrecta';
+    pwInp.classList.add('error');
+    uInp.classList.add('error');
+    pwInp.value = '';
+    setTimeout(function(){
+      pwInp.classList.remove('error');
+      uInp.classList.remove('error');
+      err.textContent = '';
+    }, 1500);
+    pwInp.focus();
   }
 }
 
-// Allow Enter key on the password field
-document.getElementById('login-input').addEventListener('keydown', function(e){
+document.getElementById('login-pw').addEventListener('keydown', function(e){
   if (e.key === 'Enter') tryLogin();
 });
+document.getElementById('login-user').addEventListener('keydown', function(e){
+  if (e.key === 'Enter') document.getElementById('login-pw').focus();
+});
+
+// ── Presence ──────────────────────────────────────────────────────────────────
+async function setPresence(online) {
+  if (!_SESSION_USER) return;
+  try {
+    var sb = getSupaClient();
+    await sb.from('presence')
+      .update({ online: online, last_seen: new Date().toISOString() })
+      .eq('username', _SESSION_USER);
+  } catch(e) {}
+}
+
+async function refreshPresence() {
+  try {
+    var sb = getSupaClient();
+    var res = await sb.from('presence').select('username,online,last_seen');
+    if (res.error || !res.data) return;
+    var now = Date.now();
+    res.data.forEach(function(row) {
+      var isOnline = row.online && (now - new Date(row.last_seen).getTime()) < _OFFLINE_AFTER_MS;
+      var dot = document.getElementById('pd-' + row.username);
+      if (dot) {
+        dot.className = 'presence-dot ' + (isOnline ? 'online' : 'offline');
+      }
+    });
+  } catch(e) {}
+}
+
+function startPresence() {
+  setPresence(true);
+  refreshPresence();
+  _presenceInterval = setInterval(function() {
+    setPresence(true);
+    refreshPresence();
+  }, _HEARTBEAT_MS);
+
+  // Go offline when tab closes
+  window.addEventListener('beforeunload', function() {
+    setPresence(false);
+    // Synchronous fallback via beacon
+    if (_SESSION_USER) {
+      var sb = getSupaClient();
+      try {
+        navigator.sendBeacon && navigator.sendBeacon(
+          'https://dhvvdbfjqeuoewtqnvqq.supabase.co/rest/v1/presence?username=eq.' + encodeURIComponent(_SESSION_USER),
+          JSON.stringify({ online: false, last_seen: new Date().toISOString() })
+        );
+      } catch(e) {}
+    }
+  });
+
+  // Also go offline when page hidden (mobile background)
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+      setPresence(false);
+    } else {
+      setPresence(true);
+      refreshPresence();
+    }
+  });
+}
 
 async function initApp() {
   setSyncStatus('', 'A ligar…');
@@ -2122,6 +2226,7 @@ async function initApp() {
   render();
   initMobileLayout();
   startPolling();
+  startPresence();
 }
 
 function startApp() {
@@ -2129,7 +2234,7 @@ function startApp() {
     document.getElementById('login-screen').classList.add('hidden');
     initApp();
   } else {
-    setTimeout(function(){ document.getElementById('login-input').focus(); }, 100);
+    setTimeout(function(){ document.getElementById('login-user').focus(); }, 100);
   }
 }
 
