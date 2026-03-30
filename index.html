@@ -33,6 +33,20 @@ html { font-size: 20px; }
 
 body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; font-weight:300; }
 
+/* ── Login screen ── */
+#login-screen { position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; align-items:center; justify-content:center; }
+#login-screen.hidden { display:none; }
+.login-box { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:2rem 2.2rem; width:90%; max-width:320px; box-shadow:0 8px 32px rgba(0,0,0,0.1); text-align:center; }
+.login-box h2 { font-family:'Playfair Display',serif; font-size:1.3rem; font-weight:400; color:var(--gold); margin-bottom:0.3rem; }
+.login-box p { font-size:0.68rem; color:var(--text-d); letter-spacing:0.06em; text-transform:uppercase; margin-bottom:1.4rem; }
+.login-box input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:0.9rem; padding:0.55rem 0.9rem; outline:none; text-align:center; letter-spacing:0.1em; transition:border-color 0.18s; margin-bottom:0.8rem; }
+.login-box input:focus { border-color:var(--gold); }
+.login-box input.error { border-color:#c43020; animation:shake 0.3s ease; }
+.login-box button { width:100%; padding:0.55rem; background:var(--gold-bg); border:1px solid var(--gold); border-radius:6px; color:var(--gold); font-family:'DM Sans',sans-serif; font-size:0.76rem; font-weight:500; cursor:pointer; letter-spacing:0.06em; text-transform:uppercase; transition:background 0.18s; }
+.login-box button:hover { background:#f5e8c0; }
+.login-error { font-size:0.65rem; color:#c43020; margin-top:0.5rem; min-height:1rem; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+
 /* ── Header ── */
 header { padding:1.1rem 2rem 0.9rem; border-bottom:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.8rem; position:sticky; top:0; z-index:10; }
 .hl h1 { font-family:'Playfair Display',serif; font-size:1.45rem; font-weight:400; color:var(--gold); outline:none; }
@@ -338,6 +352,16 @@ body.editing .insert-before-btn { display:block; }
 </head>
 <body class="">
 
+<div id="login-screen">
+  <div class="login-box">
+    <h2>Vietname &amp; Singapura</h2>
+    <p>Introduz a password para entrar</p>
+    <input type="password" id="login-input" placeholder="••••••••" autocomplete="current-password">
+    <button onclick="tryLogin()">Entrar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
 <header>
   <div class="hl">
     <h1 id="hdr-title" contenteditable="false" spellcheck="false">Vietname &amp; Singapura</h1>
@@ -369,12 +393,7 @@ body.editing .insert-before-btn { display:block; }
     <button class="export-btn" onclick="exportHTML()" title="Exportar ficheiro com os teus dados incluídos">
       ↓ Exportar
     </button>
-    <button class="export-btn" onclick="resetData()" title="Repor dados originais" style="color:#b42820;border-color:rgba(180,40,30,0.3)">
-      ↺ Repor
-    </button>
-    <button class="export-btn" onclick="window.print()" title="Imprimir itinerário">
-      🖨 Imprimir
-    </button>
+
   </div>
 </header>
 
@@ -917,6 +936,7 @@ async function loadData() {
     var row = res.data.data;
     if (row && row.itin && row.itin.hanoi && row.itin.hanoi.entries) {
       if (row.transports) transports = row.transports;
+      if (row.cities && Array.isArray(row.cities)) CITIES = row.cities;
       _lastRemoteHash = hashObj(row);
       setSyncStatus('ok', 'Sincronizado');
       return row.itin;
@@ -937,7 +957,7 @@ function persist() {
   _saveDebounce = setTimeout(async function() {
     try {
       var sb = getSupaClient();
-      var payload = { itin: data, transports: transports };
+      var payload = { itin: data, transports: transports, cities: CITIES };
       var res = await sb.from('itinerary').update({ data: payload, updated_at: new Date().toISOString() }).eq('id','main');
       if (res.error) throw res.error;
       _lastRemoteHash = hashObj(payload);
@@ -968,7 +988,11 @@ function startPolling() {
         if (row.itin && row.itin.hanoi) {
           data = row.itin;
           if (row.transports) transports = row.transports;
-          CITIES = Object.keys(data).filter(function(k){ return k[0] !== '_' && data[k] && data[k].entries; });
+          if (row.cities && Array.isArray(row.cities)) {
+            CITIES = row.cities;
+          } else {
+            CITIES = Object.keys(data).filter(function(k){ return k[0] !== '_' && data[k] && data[k].entries; });
+          }
           restorePersistedPinPositions();
           render();
           setSyncStatus('ok', 'Actualizado');
@@ -2053,24 +2077,66 @@ window.addEventListener('resize', initMobileLayout);
 window.addEventListener('load', function() { initMobileLayout(); initPinPositions(); });
 
 // Ensure DOM is ready before rendering (Safari sometimes needs this)
+// ── Login ─────────────────────────────────────────────────────────────────────
+var _PW = 'Sofia95';
+var _SESSION_KEY = 'vn_auth';
+
+function checkLogin() {
+  try { return sessionStorage.getItem(_SESSION_KEY) === '1'; } catch(e) { return false; }
+}
+
+function tryLogin() {
+  var val = document.getElementById('login-input').value;
+  var inp = document.getElementById('login-input');
+  var err = document.getElementById('login-error');
+  if (val === _PW) {
+    try { sessionStorage.setItem(_SESSION_KEY, '1'); } catch(e) {}
+    document.getElementById('login-screen').classList.add('hidden');
+    initApp();
+  } else {
+    err.textContent = 'Password incorrecta';
+    inp.classList.add('error');
+    inp.value = '';
+    setTimeout(function(){ inp.classList.remove('error'); err.textContent = ''; }, 1500);
+    inp.focus();
+  }
+}
+
+// Allow Enter key on the password field
+document.getElementById('login-input').addEventListener('keydown', function(e){
+  if (e.key === 'Enter') tryLogin();
+});
+
 async function initApp() {
   setSyncStatus('', 'A ligar…');
   data = await loadData();
   // Rebuild CITIES from loaded data (in case custom cities were saved)
-  var loadedKeys = Object.keys(data).filter(function(k){
-    return k[0] !== '_' && data[k] && data[k].entries;
-  });
-  if (loadedKeys.length > 0) CITIES = loadedKeys;
+  // CITIES order was already restored in loadData() from the saved payload
+  // Only fall back to Object.keys if nothing was loaded
+  if (CITIES.length === 0) {
+    CITIES = Object.keys(data).filter(function(k){
+      return k[0] !== '_' && data[k] && data[k].entries;
+    });
+  }
   restorePersistedPinPositions();
   render();
   initMobileLayout();
   startPolling();
 }
 
+function startApp() {
+  if (checkLogin()) {
+    document.getElementById('login-screen').classList.add('hidden');
+    initApp();
+  } else {
+    setTimeout(function(){ document.getElementById('login-input').focus(); }, 100);
+  }
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp);
+  document.addEventListener('DOMContentLoaded', startApp);
 } else {
-  initApp();
+  startApp();
 }
 
 // Rebuild the transport-between div for a given key
