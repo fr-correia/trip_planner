@@ -153,9 +153,7 @@ body.editing .hl h1, body.editing .hl p { border-bottom:1px dashed rgba(160,120,
   /* ── insert-before button: always visible in edit mode (no hover needed) ── */
   body.editing .insert-before-btn { opacity: 0.7 !important; }
 
-  /* ── Budget breakdown: tap to toggle instead of hover ── */
-  .budget-wrap .budget-breakdown { display: none; }
-  .budget-wrap.open .budget-breakdown { display: block; }
+  /* budget breakdown handled by JS toggle — no changes needed here */
 
   /* ── Modals: scrollable, safe with keyboard open ── */
   .modal {
@@ -332,9 +330,9 @@ body.editing .cost-add-row { display:flex; }
 .cost-add-btn { font-size:0.57rem; padding:2px 7px; border-radius:10px; border:1px dashed var(--border-h); background:transparent; color:var(--text-d); cursor:pointer; font-family:'DM Sans',sans-serif; }
 .cost-add-btn:hover { background:var(--bg); color:var(--text-m); }
 /* Budget in header */
-.budget-wrap { position:relative; }
-.budget-wrap:hover .budget-breakdown, .budget-wrap:focus-within .budget-breakdown { display:block; }
+.budget-wrap { position:relative; cursor:pointer; }
 .budget-breakdown { display:none; position:absolute; top:110%; right:0; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:0.65rem 0.9rem; min-width:175px; box-shadow:0 4px 16px rgba(0,0,0,0.1); z-index:50; font-size:0.61rem; }
+.budget-wrap.open .budget-breakdown { display:block; }
 .budget-line { display:flex; justify-content:space-between; gap:1rem; padding:2px 0; color:var(--text-m); }
 .budget-line.total { border-top:1px solid var(--border); margin-top:4px; padding-top:5px; font-weight:500; color:var(--text); }
 .budget-line span:last-child { color:var(--gold); font-weight:500; }
@@ -427,7 +425,7 @@ body.editing .insert-before-btn { display:block; }
       <div class="stat"><div class="stat-v">18</div><div class="stat-l">dias</div></div>
       <div class="stat"><div class="stat-v">6</div><div class="stat-l">cidades</div></div>
       <div class="stat"><div class="stat-v" id="stat-accom">7</div><div class="stat-l">alojamentos</div></div>
-      <div class="stat budget-wrap" style="cursor:default" onclick="this.classList.toggle('open')">
+      <div class="stat budget-wrap" id="budget-wrap-el">
         <div class="stat-v" id="stat-budget">0 €</div>
         <div class="stat-l">orçamento</div>
         <div class="budget-breakdown">
@@ -2259,6 +2257,35 @@ function startPresence() {
     }
   });
 }
+
+// ── Budget breakdown toggle ───────────────────────────────────────────────────
+(function() {
+  function initBudget() {
+    var wrap = document.getElementById('budget-wrap-el');
+    if (!wrap) return;
+    // Toggle on click/tap
+    wrap.addEventListener('click', function(e) {
+      e.stopPropagation();
+      wrap.classList.toggle('open');
+    });
+    // Close when clicking anywhere else
+    document.addEventListener('click', function() {
+      wrap.classList.remove('open');
+    });
+    // Desktop: also open on mouseenter, close on mouseleave
+    wrap.addEventListener('mouseenter', function() {
+      if (window.matchMedia('(hover: hover)').matches) wrap.classList.add('open');
+    });
+    wrap.addEventListener('mouseleave', function() {
+      if (window.matchMedia('(hover: hover)').matches) wrap.classList.remove('open');
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBudget);
+  } else {
+    initBudget();
+  }
+})();
 
 // ── Measure header height for accurate main height ────────────────────────
 function updateHeaderHeight() {
