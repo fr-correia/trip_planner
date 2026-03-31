@@ -78,7 +78,7 @@ body.editing .hl h1, body.editing .hl p { border-bottom:1px dashed rgba(160,120,
   display: grid;
   grid-template-columns: 1fr 22rem;
   grid-template-rows: 100%;
-  height: calc(100svh - 78px);
+  height: calc(100svh - var(--header-h, 78px));
   min-height: 500px;
 }
 .itinerary {
@@ -92,33 +92,69 @@ body.editing .hl h1, body.editing .hl p { border-bottom:1px dashed rgba(160,120,
 }
 /* ── MOBILE ── */
 @media (max-width: 680px) {
-  header { padding: 0.75rem 1rem; gap: 0.5rem; }
-  .hl h1 { font-size: 1.05rem; }
+  /* ── Header: two rows ── */
+  header {
+    padding: 0.6rem 0.9rem;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+  /* Row 1: title left, edit+export right */
+  .hl { flex: 1 1 auto; min-width: 0; }
+  .hl h1 { font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .hl p { display: none; }
-  .stats { gap: 0.7rem; }
-  .stat-v { font-size: 0.95rem; }
+  .hr {
+    flex: 0 0 auto;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  /* Hide stats on mobile — too cramped */
+  .stats { display: none; }
+  /* Presence: compact, no label — just dots + names */
+  .presence-wrap { gap: 0.4rem; }
+  .presence-user span { display: none; } /* hide names, keep dots */
+  .sync-status { display: none; } /* hide sync label — use dot only */
+  /* Edit mode buttons: stack below header */
+  .rebase-btn { font-size: 0.6rem; padding: 0.28rem 0.55rem; }
+  .cancel-edit-btn { font-size: 0.6rem; padding: 0.28rem 0.55rem; }
+  .edit-btn { font-size: 0.65rem; padding: 0.3rem 0.65rem; }
+  .edit-btn .dot { display: none; }
+  .export-btn { font-size: 0.65rem; padding: 0.3rem 0.65rem; }
 
-  /* Stack layout vertically */
+  /* ── Layout ── */
   .main { display: flex; flex-direction: column; height: auto; overflow: visible; }
-
-  /* Hide map completely on mobile for now */
   .map-panel { display: none !important; }
-
-  /* Itinerary: normal page flow */
   .itinerary {
     order: 1;
     overflow-y: visible;
     -webkit-overflow-scrolling: auto;
     border-right: none;
-    padding: 0.75rem 0.9rem;
+    padding: 0.65rem 0.75rem;
     height: auto;
     flex: 1;
   }
 
+  /* ── Cards ── */
   .day-card { padding: 0.6rem 0.7rem; }
   .vm-title { font-size: 0.8rem; }
   .vm-desc { font-size: 0.72rem; }
-  .edit-btn .dot { display: none; }
+
+  /* ── insert-before button: always visible in edit mode (no hover needed) ── */
+  body.editing .insert-before-btn { opacity: 0.7 !important; }
+
+  /* ── Budget breakdown: tap to toggle instead of hover ── */
+  .budget-wrap .budget-breakdown { display: none; }
+  .budget-wrap.open .budget-breakdown { display: block; }
+
+  /* ── Modals: scrollable, safe with keyboard open ── */
+  .modal {
+    max-height: 80vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 1rem;
+    width: calc(100% - 2rem);
+  }
+  .overlay { align-items: flex-end; padding-bottom: env(safe-area-inset-bottom); }
 }
 .city-section { margin-bottom:0.45rem; }
 .city-hdr { display:flex; align-items:center; gap:0.5rem; padding:0.38rem 0; margin-bottom:0.28rem; cursor:pointer; }
@@ -380,7 +416,7 @@ body.editing .insert-before-btn { display:block; }
       <div class="stat"><div class="stat-v">18</div><div class="stat-l">dias</div></div>
       <div class="stat"><div class="stat-v">6</div><div class="stat-l">cidades</div></div>
       <div class="stat"><div class="stat-v" id="stat-accom">7</div><div class="stat-l">alojamentos</div></div>
-      <div class="stat budget-wrap" style="cursor:default">
+      <div class="stat budget-wrap" style="cursor:default" onclick="this.classList.toggle('open')">
         <div class="stat-v" id="stat-budget">0 €</div>
         <div class="stat-l">orçamento</div>
         <div class="budget-breakdown">
@@ -395,6 +431,20 @@ body.editing .insert-before-btn { display:block; }
     <button class="cancel-edit-btn" id="cancelEditBtn" onclick="cancelEdit()" style="display: none;">Cancelar</button>
     <button class="rebase-btn" id="rebaseBtn" onclick="openRebaseModal()" title="Mudar a data de início e actualizar todos os dias">📅 Reajustar datas</button>
     <button class="rebase-btn" id="addCityBtn" onclick="openAddCityModal(CITIES[CITIES.length-1])" title="Adicionar novo local ao itinerário" style="border-color:rgba(30,100,200,0.3);color:#2a5fa8;">＋ Local</button>
+    <div class="presence-wrap" id="presence-wrap">
+      <div class="presence-user" id="pu-Francisco">
+        <div class="presence-dot offline" id="pd-Francisco" title="Francisco"></div>
+        <span>Francisco</span>
+      </div>
+      <div class="presence-user" id="pu-Cátia">
+        <div class="presence-dot offline" id="pd-Cátia" title="Cátia"></div>
+        <span>Cátia</span>
+      </div>
+    </div>
+    <div class="sync-status" id="sync-status" title="Estado da sincronização">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-label">A ligar…</span>
+    </div>
     <button class="edit-btn" id="editBtn" onclick="toggleEdit()">
       <span class="dot"></span><span id="editLbl">Editar</span>
     </button>
@@ -405,20 +455,7 @@ body.editing .insert-before-btn { display:block; }
   </div>
 </header>
 
-<div class="presence-wrap" id="presence-wrap">
-  <div class="presence-user" id="pu-Francisco">
-    <div class="presence-dot offline" id="pd-Francisco"></div>
-    <span>Francisco</span>
-  </div>
-  <div class="presence-user" id="pu-Cátia">
-    <div class="presence-dot offline" id="pd-Cátia"></div>
-    <span>Cátia</span>
-  </div>
-</div>
-<div class="sync-status" id="sync-status" title="Estado da sincronização">
-  <div class="sync-dot" id="sync-dot"></div>
-  <span id="sync-label">A ligar…</span>
-</div>
+
 <div class="toast" id="toast"></div>
 <div class="main">
   <div class="itinerary" id="itinerary"><div class="city-section" data-city="hanoi"><div class="city-hdr active"><div class="cdot" style="background:var(--hanoi)"></div><span class="cname">Hanói</span></div><div class="day-card special" data-city="hanoi" data-id="h1"><button class="del-btn" title="Apagar entrada">✕</button><div class="dnum"><div class="n">21</div><div class="m">Nov</div><div class="w">Sex</div></div><div class="dbody"><div class="vm"><div class="vm-title">Chegada a Hanói — 07h15</div><div class="vm-desc">Check-in no hostel, descanso. 
@@ -1428,6 +1465,7 @@ function render() {
   applyFilter();
   refreshAccomStat();
   renderMapLegend();
+  updateHeaderHeight();
   setTimeout(function(){
     renderMapPins();
     // initPinPositions must run after pins are in the DOM
@@ -2210,6 +2248,13 @@ function startPresence() {
     }
   });
 }
+
+// ── Measure header height for accurate main height ────────────────────────
+function updateHeaderHeight() {
+  var h = document.querySelector('header');
+  if (h) document.documentElement.style.setProperty('--header-h', h.offsetHeight + 'px');
+}
+window.addEventListener('resize', updateHeaderHeight);
 
 async function initApp() {
   setSyncStatus('', 'A ligar…');
