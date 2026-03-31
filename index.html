@@ -108,13 +108,24 @@ body.editing .hl h1, body.editing .hl p { border-bottom:1px dashed rgba(160,120,
     flex-wrap: wrap;
     justify-content: flex-end;
   }
-  /* Hide stats on mobile — too cramped */
-  .stats { display: none; }
-  /* Presence: compact, no label — just dots + names */
+  /* Stats: move to second row, compact */
+  .hr { width: 100%; flex-wrap: wrap; }
+  .stats {
+    order: 10; /* push to second row */
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--border);
+    gap: 0;
+  }
+  .stat { flex: 1; text-align: center; }
+  .stat-v { font-size: 0.85rem; }
+  .stat-l { font-size: 0.52rem; }
+  /* Presence: compact dots only */
   .presence-wrap { gap: 0.4rem; }
-  .presence-user span { display: none; } /* hide names, keep dots */
-  .sync-status { display: none; } /* hide sync label — use dot only */
-  /* Edit mode buttons: stack below header */
+  .presence-user span { display: none; }
+  .sync-status { display: none; }
+  /* Edit mode buttons smaller */
   .rebase-btn { font-size: 0.6rem; padding: 0.28rem 0.55rem; }
   .cancel-edit-btn { font-size: 0.6rem; padding: 0.28rem 0.55rem; }
   .edit-btn { font-size: 0.65rem; padding: 0.3rem 0.65rem; }
