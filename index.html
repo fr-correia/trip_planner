@@ -1383,7 +1383,7 @@ function buildCostsViewRow(e) {
   if (total <= 0) return null;
   var row = document.createElement('div'); row.className = 'costs-row';
   tArr.forEach(function(t){ if(parseFloat(t.amount)>0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent=(_TICONS[t.type]||'✈')+' '+_fmt(t.amount)+' €'+(t.note?' · '+t.note:''); row.appendChild(ch); }});
-  if (fTotal > 0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent='🍽 '+_fmt(fTotal)+' €'; row.appendChild(ch); }
+  fArr.forEach(function(f){ if(parseFloat(f.amount)>0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent='🍽 '+_fmt(f.amount)+' €'+(f.note?' · '+f.note:''); row.appendChild(ch); }});
   if (aAmt   > 0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent='🛏 '+_fmt(aAmt)+' €'; row.appendChild(ch); }
   if (oAmt   > 0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent='＋ '+_fmt(oAmt)+' €'; row.appendChild(ch); }
   var ct=document.createElement('span'); ct.className='costs-total'; ct.textContent=_fmt(total)+' €'; row.appendChild(ct);
@@ -1473,16 +1473,19 @@ function buildCostsEdit(e, cityKey) {
     var inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='0.01'; inp.placeholder='0';
     if (f&&f.amount) inp.value = f.amount;
     inp.oninput = function(){ recomputeFood(); };
+    var note = document.createElement('input'); note.className='cost-note'; note.placeholder='nota (ex: restaurante X)';
+    if (f&&f.note) note.value = f.note;
+    note.oninput = function(){ recomputeFood(); };
     var del = document.createElement('button'); del.className='cost-line-del'; del.textContent='✕';
     del.onclick = function(){ foodLines.splice(foodLines.indexOf(line),1); line.remove(); recomputeFood(); };
-    line.appendChild(ic); line.appendChild(inp); line.appendChild(del);
+    line.appendChild(ic); line.appendChild(inp); line.appendChild(note); line.appendChild(del);
     foodLines.push(line);
     lines.insertBefore(line, addFoodRow);
   }
   function recomputeFood() {
     var live = getEntry(); if (!live) return;
     if (!live.costs) live.costs = {};
-    var arr = foodLines.map(function(l){ var i=l.querySelector('input'); var a=parseFloat(i.value); return a>0?{amount:a}:null; }).filter(Boolean);
+    var arr = foodLines.map(function(l){ var i=l.querySelector('input[type=number]'),n=l.querySelector('.cost-note'); var a=parseFloat(i.value); if(!(a>0)) return null; var obj={amount:a}; if(n&&n.value.trim()) obj.note=n.value.trim(); return obj; }).filter(Boolean);
     live.costs.food = arr; saveCosts();
   }
   var addFoodRow = document.createElement('div'); addFoodRow.className='cost-add-row';
@@ -1917,8 +1920,10 @@ function saveAddCityModal() {
   PIN_CX[key] = cx;
   PIN_CY[key] = cy;
 
-  // Create data entry
-  data[key] = { label: name, color: color, entries: [], _pinX: cx, _pinY: cy };
+  // Create data entry with one default day
+  var firstEntry = { id: 'u'+(uid++), day:'?', month:'', dow:'', title: name, desc:'', accom:'', special:false, tags:[], costs:{} };
+  data[key] = { label: name, color: color, entries: [firstEntry], _pinX: cx, _pinY: cy };
+  renumberAllDates();
 
   persist();
   closeAddCityModal();
