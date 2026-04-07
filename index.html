@@ -1575,10 +1575,16 @@ function render() {
     for(var _bi=0;_bi<city.entries.length;_bi++)sec.appendChild(buildCard(city.entries[_bi],key));
 
     if (city.entries.length === 0) {
-      // Auto-add a first day rather than showing a dead-end hint
+      // Auto-add a first day, date from last entry of previous city + 1
       var _autoEntry = { id:'u'+(uid++), day:'?', month:'', dow:'', title:city.label, desc:'', accom:'', special:false, tags:[], costs:{} };
+      var _cidxAuto = CITIES.indexOf(key);
+      var _baseDateAuto = null;
+      for (var _sai = _cidxAuto - 1; _sai >= 0 && !_baseDateAuto; _sai--) {
+        var _pe = data[CITIES[_sai]] && data[CITIES[_sai]].entries;
+        if (_pe) { for (var _ei2 = _pe.length - 1; _ei2 >= 0 && !_baseDateAuto; _ei2--) { _baseDateAuto = dateFromEntry(_pe[_ei2]); } }
+      }
+      if (_baseDateAuto) { _baseDateAuto.setDate(_baseDateAuto.getDate() + 1); applyDateToEntry(_autoEntry, _baseDateAuto); }
       city.entries.push(_autoEntry);
-      renumberAllDates();
       persist();
       sec.appendChild(buildCard(_autoEntry, key));
     }
@@ -1922,9 +1928,24 @@ function saveAddCityModal() {
   PIN_CX[key] = cx;
   PIN_CY[key] = cy;
 
-  // Create data entry with one default day
+  // Create data entry with one default day, date derived from adjacent entries
   var firstEntry = { id: 'u'+(uid++), day:'?', month:'', dow:'', title: name, desc:'', accom:'', special:false, tags:[], costs:{} };
   data[key] = { label: name, color: color, entries: [firstEntry], _pinX: cx, _pinY: cy };
+  // Calculate date: find last dated entry before this city and add 1 day
+  var cidxNew = CITIES.indexOf(key);
+  var baseDate = null;
+  for (var _si = cidxNew - 1; _si >= 0 && !baseDate; _si--) {
+    var _prevEntries = data[CITIES[_si]] && data[CITIES[_si]].entries;
+    if (_prevEntries) {
+      for (var _ei = _prevEntries.length - 1; _ei >= 0 && !baseDate; _ei--) {
+        baseDate = dateFromEntry(_prevEntries[_ei]);
+      }
+    }
+  }
+  if (baseDate) {
+    baseDate.setDate(baseDate.getDate() + 1);
+    applyDateToEntry(firstEntry, baseDate);
+  }
   renumberAllDates();
 
   persist();
@@ -2060,6 +2081,16 @@ function initDrag(card, cityKey, entryId) {
     card.classList.remove('drag-over-top','drag-over-bottom');
     if (!_dragSrcId || _dragSrcId === entryId) return;
 
+    // Capture trip start date BEFORE any splice so renumbering preserves it
+    var _dropAnchor = (function() {
+      var all = getAllEntriesInOrder();
+      for (var _ai = 0; _ai < all.length; _ai++) {
+        var _d = dateFromEntry(all[_ai].entry);
+        if (_d) return _d;
+      }
+      return null;
+    })();
+
     // Find source entry and remove it
     var srcEntry = null;
     var srcEntries = data[_dragSrcCity].entries;
@@ -2078,8 +2109,8 @@ function initDrag(card, cityKey, entryId) {
     var insertAfter = (e.clientY - rect2.top) >= rect2.height / 2;
     tgtEntries.splice(insertAfter ? tgtIdx + 1 : tgtIdx, 0, srcEntry);
 
-    // If moved between cities, update cityKey on entry (stored implicitly by city array)
-    renumberAllDates();
+    // Renumber using the preserved trip start date
+    renumberAllDates(_dropAnchor);
     persist();
     render();
     if (editMode) {
@@ -2124,12 +2155,11 @@ function applyDateToEntry(entry, date) {
 }
 
 // Renumber ALL entries sequentially starting from the first entry's current date.
-// This is the single source of truth — call it after any add/remove operation.
-function renumberAllDates() {
+// Pass an explicit anchorDate to preserve the trip start date after drag-and-drop.
+function renumberAllDates(anchorDate) {
   var all = getAllEntriesInOrder();
   if (all.length === 0) return;
-  // Anchor: use the date of the very first entry as day 0
-  var anchor = dateFromEntry(all[0].entry);
+  var anchor = anchorDate || dateFromEntry(all[0].entry);
   if (!anchor) return;
   for (var i = 0; i < all.length; i++) {
     var d = new Date(anchor.getTime());
