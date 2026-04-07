@@ -329,6 +329,9 @@ body.editing .costs-edit { display:block; }
 .cost-line input[type=number] { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--gold); font-family:'DM Sans',sans-serif; font-size:0.63rem; padding:3px 6px; outline:none; min-width:0; }
 .cost-line input[type=number]:focus { border-color:var(--gold); }
 .cost-line input[type=number]::placeholder { color:var(--text-d); font-style:italic; }
+.cost-line input.cost-note { flex:1.4; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text-m); font-family:'DM Sans',sans-serif; font-size:0.6rem; padding:3px 6px; outline:none; min-width:0; }
+.cost-line input.cost-note:focus { border-color:var(--border-h); }
+.cost-line input.cost-note::placeholder { color:var(--text-d); font-style:italic; }
 .cost-line-del { background:none; border:none; cursor:pointer; color:var(--text-d); font-size:9px; padding:2px 3px; line-height:1; display:none; flex-shrink:0; }
 .cost-line-del:hover { color:#b42820; }
 body.editing .cost-line-del { display:block; }
@@ -1135,6 +1138,7 @@ function startPolling() {
             restorePersistedPinPositions();
             render();
             refreshBudget();
+            refreshStatusStat();
             setSyncStatus('ok', 'Actualizado');
             showToast('Itinerário actualizado ✓');
           }
@@ -1378,7 +1382,7 @@ function buildCostsViewRow(e) {
   var total  = tTotal + fTotal + oAmt + aAmt;
   if (total <= 0) return null;
   var row = document.createElement('div'); row.className = 'costs-row';
-  tArr.forEach(function(t){ if(parseFloat(t.amount)>0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent=(_TICONS[t.type]||'✈')+' '+_fmt(t.amount)+' €'; row.appendChild(ch); }});
+  tArr.forEach(function(t){ if(parseFloat(t.amount)>0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent=(_TICONS[t.type]||'✈')+' '+_fmt(t.amount)+' €'+(t.note?' · '+t.note:''); row.appendChild(ch); }});
   if (fTotal > 0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent='🍽 '+_fmt(fTotal)+' €'; row.appendChild(ch); }
   if (aAmt   > 0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent='🛏 '+_fmt(aAmt)+' €'; row.appendChild(ch); }
   if (oAmt   > 0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent='＋ '+_fmt(oAmt)+' €'; row.appendChild(ch); }
@@ -1441,16 +1445,19 @@ function buildCostsEdit(e, cityKey) {
     var inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='0.01'; inp.placeholder='0';
     if (t&&t.amount) inp.value = t.amount;
     inp.oninput = function(){ recomputeTrans(); };
+    var note = document.createElement('input'); note.className='cost-note'; note.placeholder='nota (ex: táxi aeroporto)';
+    if (t&&t.note) note.value = t.note;
+    note.oninput = function(){ recomputeTrans(); };
     var del = document.createElement('button'); del.className='cost-line-del'; del.textContent='✕';
     del.onclick = function(){ transLines.splice(transLines.indexOf(line),1); line.remove(); recomputeTrans(); };
-    line.appendChild(ic); line.appendChild(sel); line.appendChild(inp); line.appendChild(del);
+    line.appendChild(ic); line.appendChild(sel); line.appendChild(inp); line.appendChild(note); line.appendChild(del);
     transLines.push(line);
     lines.insertBefore(line, addTransRow);
   }
   function recomputeTrans() {
     var live = getEntry(); if (!live) return;
     if (!live.costs) live.costs = {};
-    var arr = transLines.map(function(l){ var s=l.querySelector('select'),i=l.querySelector('input'); var a=parseFloat(i.value); return a>0?{type:s.value,amount:a}:null; }).filter(Boolean);
+    var arr = transLines.map(function(l){ var s=l.querySelector('select'),i=l.querySelector('input[type=number]'),n=l.querySelector('.cost-note'); var a=parseFloat(i.value); if(!(a>0)) return null; var obj={type:s.value,amount:a}; if(n&&n.value.trim()) obj.note=n.value.trim(); return obj; }).filter(Boolean);
     live.costs.transport = arr; saveCosts();
   }
   var addTransRow = document.createElement('div'); addTransRow.className='cost-add-row';
