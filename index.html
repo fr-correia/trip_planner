@@ -159,7 +159,8 @@ body.editing .hl h1, body.editing .hl p { border-bottom:1px dashed rgba(160,120,
   /* ── insert-before button: always visible in edit mode (no hover needed) ── */
   body.editing .insert-before-btn { opacity: 0.7 !important; }
 
-  /* budget breakdown handled by JS toggle — no changes needed here */
+  /* budget breakdown: reposition to avoid overflow on narrow screens */
+  .budget-breakdown { right:auto; left:50%; transform:translateX(-50%); }
 
   /* ── Modals: scrollable, safe with keyboard open ── */
   .modal {
@@ -363,14 +364,20 @@ body.editing .cost-add-row { display:flex; }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
 /* Drag-and-drop */
-.day-card.drag-over-top { border-top:2px solid var(--gold) !important; }
-.day-card.drag-over-bottom { border-bottom:2px solid var(--gold) !important; }
+.day-card.drag-over-top { border-top:3px solid var(--gold) !important; background:var(--gold-bg) !important; }
+.day-card.drag-over-bottom { border-bottom:3px solid var(--gold) !important; background:var(--gold-bg) !important; }
+.day-card.dragging { opacity:0.35; box-shadow:none; }
 body.editing .day-card { cursor:grab; }
 body.editing .day-card:active { cursor:grabbing; }
 body.editing .day-card .del-btn, body.editing .day-card .insert-before-btn { cursor:pointer; }
 
 /* City day count badge */
 .city-day-count { font-size:0.58rem; color:var(--text-d); margin-left:0.4rem; font-weight:400; }
+.city-empty-hint { font-size:0.68rem; color:var(--text-d); padding:1rem 1.2rem; font-style:italic; border:1px dashed var(--border); border-radius:8px; margin:0.5rem 0.8rem; line-height:1.5; }
+.filter-bar { display:flex; align-items:center; gap:0.6rem; padding:0.45rem 1.1rem; background:var(--gold-bg); border-bottom:1px solid rgba(160,120,40,0.2); font-size:0.68rem; color:var(--gold); font-family:'DM Sans',sans-serif; }
+#filter-label { font-weight:500; }
+#filter-clear { background:transparent; border:1px solid rgba(160,120,40,0.4); border-radius:20px; color:var(--gold); font-size:0.62rem; padding:0.15rem 0.6rem; cursor:pointer; font-family:'DM Sans',sans-serif; letter-spacing:0.05em; }
+#filter-clear:hover { background:var(--gold); color:#fff; }
 
 /* Print */
 @media print {
@@ -477,6 +484,10 @@ body.editing .insert-before-btn { display:block; }
 
 <div class="toast" id="toast"></div>
 <div class="main">
+  <div class="filter-bar" id="filter-bar" style="display:none">
+    <span id="filter-label"></span>
+    <button id="filter-clear" onclick="selectCity(activeCity)" title="Limpar filtro">✕ Ver tudo</button>
+  </div>
   <div class="itinerary" id="itinerary"><div class="city-section" data-city="hanoi"><div class="city-hdr active"><div class="cdot" style="background:var(--hanoi)"></div><span class="cname">Hanói</span></div><div class="day-card special" data-city="hanoi" data-id="h1"><button class="del-btn" title="Apagar entrada">✕</button><div class="dnum"><div class="n">21</div><div class="m">Nov</div><div class="w">Sex</div></div><div class="dbody"><div class="vm"><div class="vm-title">Chegada a Hanói — 07h15</div><div class="vm-desc">Check-in no hostel, descanso. 
 Tarde: Bairro Antigo, Lago Hoan Kiem ao entardecer. 
 Jantar de phở numa barraca de rua.</div><div class="tags"><span class="tag amber">jetlag day<button class="tag-x" title="Remover">✕</button></span><span class="tag blue">sem pressão<button class="tag-x" title="Remover">✕</button></span><span class="tag purple">asd<button class="tag-x" title="Remover">✕</button></span><button class="add-tag-btn">+ etiqueta</button></div><div class="accom-row"><span class="accom-ic">🛏</span><span class="accom-txt set">Alojamento 1</span></div></div><div class="em"><input class="ef et" placeholder="Título"><textarea class="ef ed" placeholder="Descrição">Check-in no hostel, descanso. 
@@ -1057,21 +1068,28 @@ function startPolling() {
       var row = res.data.data;
       var remoteHash = hashObj(row);
       if (_lastRemoteHash && remoteHash !== _lastRemoteHash) {
-        // Remote changed — reload
+        // Remote changed
         _lastRemoteHash = remoteHash;
-        if (row.itin && row.itin.hanoi) {
-          data = row.itin;
-          if (row.transports) transports = row.transports;
-          if (row.cities && Array.isArray(row.cities)) {
-            CITIES = row.cities;
+        if (row.itin && Object.keys(row.itin).some(function(k){ return row.itin[k] && row.itin[k].entries; })) {
+          // If user has unsaved local changes, warn before overwriting
+          var localHash = hashObj({ itin: data, transports: transports, cities: CITIES });
+          if (localHash !== remoteHash && dataSnapshot) {
+            showToast('⚠️ Outra pessoa editou enquanto estavas a editar!');
+            setSyncStatus('error', 'Conflito detectado');
           } else {
-            CITIES = Object.keys(data).filter(function(k){ return k[0] !== '_' && data[k] && data[k].entries; });
+            data = row.itin;
+            if (row.transports) transports = row.transports;
+            if (row.cities && Array.isArray(row.cities)) {
+              CITIES = row.cities;
+            } else {
+              CITIES = Object.keys(data).filter(function(k){ return k[0] !== '_' && data[k] && data[k].entries; });
+            }
+            restorePersistedPinPositions();
+            render();
+            refreshBudget();
+            setSyncStatus('ok', 'Actualizado');
+            showToast('Itinerário actualizado ✓');
           }
-          restorePersistedPinPositions();
-          render();
-          refreshBudget();
-          setSyncStatus('ok', 'Actualizado');
-          showToast('Itinerário actualizado ✓');
         }
       } else {
         setSyncStatus('ok', 'Sincronizado');
@@ -1268,6 +1286,16 @@ function buildCostsViewRow(e) {
   if (aAmt   > 0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent='🛏 '+_fmt(aAmt)+' €'; row.appendChild(ch); }
   if (oAmt   > 0){ var ch=document.createElement('span'); ch.className='cost-chip'; ch.textContent='＋ '+_fmt(oAmt)+' €'; row.appendChild(ch); }
   var ct=document.createElement('span'); ct.className='costs-total'; ct.textContent=_fmt(total)+' €'; row.appendChild(ct);
+  // Click row to enter edit mode and scroll to cost section
+  row.title = 'Clica para editar custos';
+  row.style.cursor = 'pointer';
+  row.addEventListener('click', function() {
+    if (!editMode) toggleEdit();
+    setTimeout(function() {
+      var card = row.closest('.day-card');
+      if (card) { var ce = card.querySelector('.costs-edit'); if (ce) ce.scrollIntoView({behavior:'smooth', block:'center'}); }
+    }, editMode ? 0 : 150);
+  });
   return row;
 }
 
@@ -1431,6 +1459,13 @@ function render() {
 
     for(var _bi=0;_bi<city.entries.length;_bi++)sec.appendChild(buildCard(city.entries[_bi],key));
 
+    if (city.entries.length === 0) {
+      var emptyHint = document.createElement('div');
+      emptyHint.className = 'city-empty-hint';
+      emptyHint.textContent = 'Usa "＋ dia a seguir" num dia adjacente para adicionar dias aqui.';
+      sec.appendChild(emptyHint);
+    }
+
     // "Add city here" button BEFORE this city section (between prev transport and this section)
     var addCityBefore = document.createElement('button');
     addCityBefore.className = 'add-city-btn';
@@ -1550,19 +1585,20 @@ function liveUpdate(cityKey, id, field, val) {
 
 // ── Tag management ─────────────────────────────────────────────────────────────
 function deleteTag(cityKey, entryId, tagIndex) {
-  var e = data[cityKey].entries.find(function(x) { return x.id === entryId; });
-  if (!e) return;
-  e.tags.splice(tagIndex, 1);
-  persist();
-  // Replace tags elements in this card with fresh DOM nodes
-  var card = document.querySelector('.day-card[data-id="' + entryId + '"]');
-  if (card) {
-    var oldTags = card.querySelectorAll('.tags');
-    oldTags.forEach(function(el) {
-      var newEl = buildTagsEl(e.tags, cityKey, entryId);
-      el.parentNode.replaceChild(newEl, el);
-    });
-  }
+  showConfirm('Apagar esta etiqueta?', function() {
+    var e = data[cityKey].entries.find(function(x) { return x.id === entryId; });
+    if (!e) return;
+    e.tags.splice(tagIndex, 1);
+    persist();
+    var card = document.querySelector('.day-card[data-id="' + entryId + '"]');
+    if (card) {
+      var oldTags = card.querySelectorAll('.tags');
+      oldTags.forEach(function(el) {
+        var newEl = buildTagsEl(e.tags, cityKey, entryId);
+        el.parentNode.replaceChild(newEl, el);
+      });
+    }
+  });
 }
 
 function openTagModal(cityKey, entryId) {
@@ -1662,6 +1698,7 @@ function toggleEdit() {
 }
 
 function cancelEdit() {
+  clearTimeout(saveTimer); // cancel any pending liveUpdate saves before restoring snapshot
   if (dataSnapshot) { data = dataSnapshot; dataSnapshot = null; persist(); }
   editMode = false;
   document.body.classList.remove('editing');
@@ -1789,6 +1826,16 @@ function resetData() {
 // Close modals on overlay click
 document.getElementById('modal-tag').addEventListener('click',function(e){if(e.target===e.currentTarget)closeTagModal();});
 
+// Close any open modal on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('modal-transport').classList.contains('open')) { closeTransportModal(); return; }
+  if (document.getElementById('modal-tag').classList.contains('open'))       { closeTagModal();       return; }
+  if (document.getElementById('modal-rebase').classList.contains('open'))    { closeRebaseModal();    return; }
+  if (document.getElementById('modal-city-add').classList.contains('open'))  { closeAddCityModal();   return; }
+  if (document.getElementById('modal-confirm').classList.contains('open'))   { document.getElementById('modal-confirm').classList.remove('open'); return; }
+});
+
 // ── Toast ─────────────────────────────────────────────────────────────────────
 var _toastTimer;
 function showToast(msg) {
@@ -1839,10 +1886,10 @@ function initDrag(card, cityKey, entryId) {
     _dragSrcCity = cityKey;
     _dragSrcId   = entryId;
     e.dataTransfer.effectAllowed = 'move';
-    setTimeout(function(){ card.style.opacity = '0.4'; }, 0);
+    setTimeout(function(){ card.classList.add('dragging'); }, 0);
   });
   card.addEventListener('dragend', function() {
-    card.style.opacity = '';
+    card.classList.remove('dragging');
     document.querySelectorAll('.day-card').forEach(function(c){
       c.classList.remove('drag-over-top','drag-over-bottom');
     });
@@ -1995,8 +2042,7 @@ function updateRebasePreview() {
     var ld = dateFromEntry(lastE);
     if (ld) { ld.setDate(ld.getDate()+offsetDays); previewLines.push('Último dia: '+ld.getDate()+' '+PT_MONTHS[ld.getMonth()]+' '+ld.getFullYear()); }
   }
-  var sign = offsetDays >= 0 ? '+' : '';
-  previewLines.push('Deslocamento: '+sign+offsetDays+' dia'+(Math.abs(offsetDays)!==1?'s':''));
+  if (offsetDays === 0) { preview.innerHTML = '<span style="color:var(--gold)">Sem alteração às datas.</span>'; return; }
   preview.innerHTML = previewLines.join('<br>');
 }
 
@@ -2071,6 +2117,17 @@ function applyFilter() {
   var _hh=document.querySelectorAll('.city-hdr');
   for(var _hhi=0;_hhi<_hh.length;_hhi++){var _h=_hh[_hhi];var _hs=_h.closest('.city-section');_h.classList.toggle('active',!city||(_hs&&_hs.dataset.city===city));}
   for(var _pi=0;_pi<CITIES.length;_pi++){var _ck=CITIES[_pi];var _pin=document.getElementById('pin-'+_ck);var _leg=document.getElementById('leg-'+_ck);if(_pin){_pin.classList.toggle('dimmed',!!(city&&_ck!==city));_pin.classList.toggle('active',_ck===city);}if(_leg)_leg.classList.toggle('active',_ck===city);}
+  // Filter bar indicator
+  var fb = document.getElementById('filter-bar');
+  var fl = document.getElementById('filter-label');
+  if (fb && fl) {
+    if (city && data[city]) {
+      fl.textContent = 'A ver: ' + data[city].label;
+      fb.style.display = 'flex';
+    } else {
+      fb.style.display = 'none';
+    }
+  }
   // Also update route-line visibility
   updatePolyline();
 }
