@@ -1945,6 +1945,20 @@ function saveAddCityModal() {
   if (baseDate) {
     baseDate.setDate(baseDate.getDate() + 1);
     applyDateToEntry(firstEntry, baseDate);
+  } else {
+    // Inserted at the start: find first dated entry in a following city and subtract 1 day
+    for (var _ni = cidxNew + 1; _ni < CITIES.length && !baseDate; _ni++) {
+      var _nextEntries = data[CITIES[_ni]] && data[CITIES[_ni]].entries;
+      if (_nextEntries) {
+        for (var _nei = 0; _nei < _nextEntries.length && !baseDate; _nei++) {
+          baseDate = dateFromEntry(_nextEntries[_nei]);
+        }
+      }
+    }
+    if (baseDate) {
+      baseDate.setDate(baseDate.getDate() - 1);
+      applyDateToEntry(firstEntry, baseDate);
+    }
   }
   renumberAllDates();
 
