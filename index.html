@@ -1059,6 +1059,7 @@ function startPolling() {
           }
           restorePersistedPinPositions();
           render();
+          refreshBudget();
           setSyncStatus('ok', 'Actualizado');
           showToast('Itinerário actualizado ✓');
         }
@@ -1290,7 +1291,7 @@ function buildCostsEdit(e, cityKey) {
     var live = getEntry(); if (!live) return;
     refreshBudget();
     refreshCostChips(live, cityKey);
-    clearTimeout(saveTimer); saveTimer = setTimeout(persist, 500);
+    persist();
   }
 
   // --- Transport lines ---
@@ -2307,6 +2308,7 @@ async function initApp() {
   }
   restorePersistedPinPositions();
   render();
+  refreshBudget();
   initMobileLayout();
   startPolling();
   startPresence();
