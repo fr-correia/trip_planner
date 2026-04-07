@@ -333,7 +333,7 @@ body.editing .cost-add-row { display:flex; }
 .budget-wrap { position:relative; cursor:pointer; }
 .budget-breakdown { display:none; position:absolute; top:110%; right:0; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:0.65rem 0.9rem; min-width:175px; box-shadow:0 4px 16px rgba(0,0,0,0.1); z-index:50; font-size:0.61rem; }
 .budget-wrap.open .budget-breakdown { display:block; }
-.budget-line { display:flex; justify-content:space-between; gap:1rem; padding:2px 0; color:var(--text-m); }
+.budget-line { display:flex; justify-content:space-between; gap:1rem; padding:2px 0; color:var(--text-m); white-space:nowrap; }
 .budget-line.total { border-top:1px solid var(--border); margin-top:4px; padding-top:5px; font-weight:500; color:var(--text); }
 .budget-line span:last-child { color:var(--gold); font-weight:500; }
 /* Transport modal cost field */
@@ -457,8 +457,11 @@ body.editing .insert-before-btn { display:block; }
     <button class="edit-btn" id="editBtn" onclick="toggleEdit()">
       <span class="dot"></span><span id="editLbl">Editar</span>
     </button>
-    <button class="export-btn" onclick="exportHTML()" title="Exportar ficheiro com os teus dados incluídos">
-      ↓ Exportar
+    <button class="export-btn" onclick="exportHTML()" title="Exportar HTML auto-contido com dados incluídos">
+      ↓ HTML
+    </button>
+    <button class="export-btn" onclick="exportJSON()" title="Guardar backup dos dados em JSON">
+      ↓ JSON
     </button>
 
   </div>
@@ -998,7 +1001,7 @@ async function loadData() {
     var res = await sb.from('itinerary').select('data').eq('id','main').single();
     if (res.error) throw res.error;
     var row = res.data.data;
-    if (row && row.itin && row.itin.hanoi && row.itin.hanoi.entries) {
+    if (row && row.itin && Object.keys(row.itin).some(function(k){ return row.itin[k] && row.itin[k].entries; })) {
       if (row.transports) transports = row.transports;
       if (row.cities && Array.isArray(row.cities)) CITIES = row.cities;
       _lastRemoteHash = hashObj(row);
@@ -2112,6 +2115,27 @@ function exportHTML() {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = 'itinerario_vietname.html';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+}
+
+function exportJSON() {
+  var payload = { itin: data, transports: transports, cities: CITIES };
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  var date = new Date().toISOString().slice(0,10);
+  var filename = 'itinerario_backup_' + date + '.json';
+  if (window.showSaveFilePicker) {
+    window.showSaveFilePicker({
+      suggestedName: filename,
+      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+    }).then(function(fh){ return fh.createWritable(); })
+      .then(function(w){ return w.write(blob).then(function(){ return w.close(); }); })
+      .catch(function(err){ if(err.name!=='AbortError') console.error(err); });
+  } else {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
   }

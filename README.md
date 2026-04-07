@@ -91,24 +91,44 @@ var PIN_CY = { cidade1: 108, cidade2: 109 };
 
 Lista de valores atualmente hardcoded no `index.html` que podem precisar de ser alterados:
 
-| Linha | Parâmetro | Valor atual | Descrição |
-|-------|-----------|-------------|-----------|
-| 967 | `SUPA_URL` | `https://dhvvdbfjqeuoewtqnvqq.supabase.co` | URL do projeto Supabase |
-| 968 | `SUPA_KEY` | `sb_publishable_bvwHu05N...` | Chave pública Supabase |
-| 2147 | `USERS` | `{ 'Francisco': 'Sofia95', 'Cátia': 'Sofia95' }` | Credenciais de acesso |
-| 4 | `<title>` | `Vietname + Singapura — Nov/Dez 2025` | Título da viagem |
-| 420–421 | Header | `Vietname & Singapura`, `Lisboa · 21 Nov — 8 Dez 2025` | Nome e datas da viagem |
-| 547 | `CITIES` | `['hanoi','halong','danang',...]` | Cidades iniciais |
-| 2393–2394 | `PIN_CX/CY` | coordenadas por cidade | Posição dos pins no mapa |
-| 1025, 1045 | table name | `'itinerary'` | Nome da tabela no Supabase |
-| 2206–2215 | table name | `'presence'` | Nome da tabela de presença |
-| 2156 | session key | `'vn_user'` | Chave de sessão no sessionStorage |
-| 2106, 2114 | export filename | `'itinerario_vietname.html'` | Nome do ficheiro exportado |
-| 1021 | save debounce | `800ms` | Delay antes de guardar no Supabase |
-| 1041 | poll interval | `8000ms` | Frequência de sincronização remota |
-| 2151 | heartbeat | `10000ms` | Intervalo de presença |
-| 2152 | offline threshold | `25000ms` | Tempo sem heartbeat para marcar offline |
-| 1394–1395 | currency | `€` | Símbolo de moeda |
+### Credenciais e autenticação
+
+| Linha | Parâmetro | Valor atual |
+|-------|-----------|-------------|
+| 967 | `SUPA_URL` | `https://dhvvdbfjqeuoewtqnvqq.supabase.co` |
+| 968 | `SUPA_KEY` | `sb_publishable_bvwHu05NfTKZNlQUa7VHuw_Q4OzE87Q` |
+| 2147 | `USERS` | `{ 'Francisco': 'Sofia95', 'Cátia': 'Sofia95' }` |
+| 2156 | session key | `'vn_user'` |
+
+### Conteúdo da viagem
+
+| Linha | Parâmetro | Valor atual |
+|-------|-----------|-------------|
+| 4 | `<title>` | `Vietname + Singapura — Nov/Dez 2025` |
+| 420 | `<h1>` | `Vietname & Singapura` |
+| 421 | subtítulo | `Lisboa · 21 Nov — 8 Dez 2025` |
+| 547 | `CITIES` | `['hanoi','halong','danang','hoian','hcmc','singapore']` |
+| 2393 | `PIN_CX` | `{hanoi:149, halong:171, danang:191, hoian:193, hcmc:163, singapore:219}` |
+| 2394 | `PIN_CY` | `{hanoi:108, halong:109, danang:236, hoian:253, hcmc:370, singapore:518}` |
+| 22–23 | CSS city colors | `--hanoi:#c94030`, `--halong:#2a7e96`, `--danang:#c07020`, `--hoian:#a07828`, `--hcmc:#6b44c4`, `--singapore:#1e8f66` |
+| 2106, 2114 | export filename | `'itinerario_vietname.html'` |
+
+### Base de dados
+
+| Linha | Parâmetro | Valor atual |
+|-------|-----------|-------------|
+| 1025, 1045 | table + row ID | `'itinerary'`, `'main'` |
+| 2206–2215 | presence table | `'presence'` |
+
+### Timings e UI
+
+| Linha | Parâmetro | Valor atual |
+|-------|-----------|-------------|
+| 1021 | save debounce | `800ms` |
+| 1041 | poll interval | `8000ms` |
+| 2151 | heartbeat | `10000ms` |
+| 2152 | offline threshold | `25000ms` |
+| 1394–1395 | currency symbol | `€` |
 
 ## Notas de segurança
 
