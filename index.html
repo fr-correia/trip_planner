@@ -374,6 +374,35 @@ body.editing .day-card .del-btn, body.editing .day-card .insert-before-btn { cur
 /* City day count badge */
 .city-day-count { font-size:0.58rem; color:var(--text-d); margin-left:0.4rem; font-weight:400; }
 .city-empty-hint { font-size:0.68rem; color:var(--text-d); padding:1rem 1.2rem; font-style:italic; border:1px dashed var(--border); border-radius:8px; margin:0.5rem 0.8rem; line-height:1.5; }
+/* Status badge */
+.status-badge { display:inline-flex; align-items:center; gap:0.25rem; font-size:0.58rem; font-family:'DM Sans',sans-serif; letter-spacing:0.06em; text-transform:uppercase; padding:0.18rem 0.55rem; border-radius:20px; border:1px solid transparent; cursor:pointer; user-select:none; transition:all 0.15s; margin-bottom:0.35rem; }
+.status-badge.none  { background:var(--bg); border-color:var(--border); color:var(--text-d); }
+.status-badge.booked { background:#e6f2fb; border-color:#a0c8e8; color:#1a5a82; }
+.status-badge.paid   { background:#e6f7ef; border-color:#8ecfae; color:#1a6e44; }
+.status-badge:hover { filter:brightness(0.93); }
+/* Accom booking info */
+.accom-booking { display:flex; align-items:center; gap:0.5rem; margin-top:0.2rem; flex-wrap:wrap; }
+.accom-ref { font-size:0.62rem; font-family:'DM Sans',sans-serif; color:var(--text-d); background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:0.1rem 0.4rem; letter-spacing:0.04em; }
+.accom-link { font-size:0.62rem; color:var(--gold); text-decoration:none; }
+.accom-link:hover { text-decoration:underline; }
+.accom-sub-inp { width:100%; font-size:0.72rem; font-family:'DM Sans',sans-serif; border:1px solid var(--border); border-radius:5px; padding:5px 8px; background:var(--bg); color:var(--text); outline:none; margin-top:4px; }
+.accom-sub-inp:focus { border-color:var(--gold); }
+/* Transport times */
+.te-times { font-size:0.72rem; color:var(--gold); font-family:'DM Sans',sans-serif; font-weight:500; letter-spacing:0.02em; }
+.te-booking { font-size:0.62rem; color:var(--text-d); margin-top:2px; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; }
+.te-booking a { color:var(--gold); text-decoration:none; }
+.te-booking a:hover { text-decoration:underline; }
+.t-time-row { display:flex; gap:0.6rem; }
+.t-time-row input { flex:1; }
+/* Stat pending */
+#stat-pending-wrap { cursor:default; }
+/* Budget per person */
+.bd-perperson { display:flex; justify-content:space-between; gap:1rem; padding:4px 0 2px; color:var(--text-d); font-size:0.59rem; border-top:1px dashed var(--border); margin-top:2px; white-space:nowrap; }
+.bd-perperson span:last-child { color:var(--text-m); }
+.travelers-ctrl { display:flex; align-items:center; gap:0.3rem; margin-top:0.4rem; padding-top:0.4rem; border-top:1px solid var(--border); font-size:0.6rem; color:var(--text-d); }
+.travelers-ctrl button { width:18px; height:18px; border-radius:50%; border:1px solid var(--border); background:transparent; cursor:pointer; font-size:0.7rem; line-height:1; color:var(--text-m); display:flex; align-items:center; justify-content:center; }
+.travelers-ctrl button:hover { border-color:var(--gold); color:var(--gold); }
+#travelers-count { font-weight:500; color:var(--text); min-width:1ch; text-align:center; }
 .filter-bar { display:flex; align-items:center; gap:0.6rem; padding:0.45rem 1.1rem; background:var(--gold-bg); border-bottom:1px solid rgba(160,120,40,0.2); font-size:0.68rem; color:var(--gold); font-family:'DM Sans',sans-serif; }
 #filter-label { font-weight:500; }
 #filter-clear { background:transparent; border:1px solid rgba(160,120,40,0.4); border-radius:20px; color:var(--gold); font-size:0.62rem; padding:0.15rem 0.6rem; cursor:pointer; font-family:'DM Sans',sans-serif; letter-spacing:0.05em; }
@@ -438,6 +467,7 @@ body.editing .insert-before-btn { display:block; }
       <div class="stat"><div class="stat-v">18</div><div class="stat-l">dias</div></div>
       <div class="stat"><div class="stat-v">6</div><div class="stat-l">cidades</div></div>
       <div class="stat"><div class="stat-v" id="stat-accom">7</div><div class="stat-l">alojamentos</div></div>
+      <div class="stat" id="stat-pending-wrap" title="Entradas por reservar"><div class="stat-v" id="stat-pending">0</div><div class="stat-l">por reservar</div></div>
       <div class="stat budget-wrap" id="budget-wrap-el">
         <div class="stat-v" id="stat-budget">0 €</div>
         <div class="stat-l">orçamento</div>
@@ -447,6 +477,13 @@ body.editing .insert-before-btn { display:block; }
           <div class="budget-line"><span>🛏 Alojamento</span><span id="bd-accom">0 €</span></div>
           <div class="budget-line"><span>＋ Outros</span><span id="bd-other">0 €</span></div>
           <div class="budget-line total"><span>Total</span><span id="bd-total">0 €</span></div>
+          <div class="bd-perperson"><span>Por pessoa</span><span id="bd-perperson">0 €</span></div>
+          <div class="travelers-ctrl">
+            <button onclick="changeTravelers(-1)">−</button>
+            <span id="travelers-count">2</span>
+            <span>viajantes</span>
+            <button onclick="changeTravelers(1)">＋</button>
+          </div>
         </div>
       </div>
     </div>
@@ -540,6 +577,15 @@ Tarde: Santuário de My Son. Noite: lanternas no rio Thu Bon.</textarea><div cla
     <input id="t-duration" placeholder="ex: 2h30">
     <label>Custo (€)</label>
     <input id="t-cost" type="number" min="0" step="0.01" placeholder="ex: 45">
+    <label>Horário</label>
+    <div class="t-time-row">
+      <input id="t-depart" type="time" placeholder="Partida" title="Hora de partida">
+      <input id="t-arrive" type="time" placeholder="Chegada" title="Hora de chegada">
+    </div>
+    <label>Referência de reserva</label>
+    <input id="t-ref" placeholder="ex: RYANAIR-ABC123">
+    <label>Link da reserva</label>
+    <input id="t-url" placeholder="https://...">
     <label>Nota opcional</label>
     <input id="t-note" placeholder="ex: reservar antes">
     <div class="mactions">
@@ -566,6 +612,7 @@ Tarde: Santuário de My Son. Noite: lanternas no rio Thu Bon.</textarea><div cla
 
 <script>
 var CITIES = ['hanoi','halong','danang','hoian','hcmc','singapore'];
+var N_TRAVELERS = 2;
 
 // Palette for dynamically-created cities (cycles through these)
 var CITY_PALETTE = [
@@ -1036,6 +1083,7 @@ async function loadData() {
 // Save to Supabase (debounced)
 function persist() {
   refreshAccomStat();
+  refreshStatusStat();
   refreshBudget();
   setSyncStatus('saving', 'A guardar…');
   clearTimeout(_saveDebounce);
@@ -1113,6 +1161,12 @@ function restorePersistedPinPositions() {
     }
   });
 }
+function refreshStatusStat() {
+  var pending = 0;
+  CITIES.forEach(function(k){ (data[k].entries||[]).forEach(function(e){ if (!e.status || e.status === 'none') pending++; }); });
+  var el = document.getElementById('stat-pending'); if (el) el.textContent = pending;
+}
+
 function refreshAccomStat() {
   var seen = 0;
   for(var _ri=0;_ri<CITIES.length;_ri++){var _re=data[CITIES[_ri]].entries;for(var _rj=0;_rj<_re.length;_rj++){var acc=_re[_rj].accom&&_re[_rj].accom.trim();if(!acc)continue;if(_rj>0&&_re[_rj-1].accom&&_re[_rj-1].accom.trim()===acc)continue;seen++;}}
@@ -1192,6 +1246,27 @@ function buildCard(e, cityKey) {
   var vm = document.createElement('div');
   vm.className = 'vm';
 
+  // Status badge (cycles: none → booked → paid → none)
+  var statusLabels = { none: '○ por reservar', booked: '◑ reservado', paid: '● pago' };
+  var statusBadge = document.createElement('div');
+  var curStatus = e.status || 'none';
+  statusBadge.className = 'status-badge ' + curStatus;
+  statusBadge.textContent = statusLabels[curStatus];
+  statusBadge.title = 'Clica para mudar estado';
+  statusBadge.addEventListener('click', function(ev) {
+    ev.stopPropagation();
+    var order = ['none','booked','paid'];
+    var next = order[(order.indexOf(e.status||'none') + 1) % order.length];
+    var live = data[cityKey].entries.find(function(x){ return x.id === e.id; });
+    if (live) live.status = next === 'none' ? undefined : next;
+    e.status = next === 'none' ? undefined : next;
+    statusBadge.className = 'status-badge ' + next;
+    statusBadge.textContent = statusLabels[next];
+    refreshStatusStat();
+    persist();
+  });
+  vm.appendChild(statusBadge);
+
   var vmTitle = document.createElement('div');
   vmTitle.className = 'vm-title';
   vmTitle.textContent = e.title;
@@ -1218,6 +1293,14 @@ function buildCard(e, cityKey) {
   accomRow.appendChild(accomIc);
   accomRow.appendChild(accomTxt);
   vm.appendChild(accomRow);
+  // Booking ref + link (view)
+  if (e.accom_ref || e.accom_url) {
+    var accomBook = document.createElement('div');
+    accomBook.className = 'accom-booking';
+    if (e.accom_ref) { var rf = document.createElement('span'); rf.className='accom-ref'; rf.textContent='# '+e.accom_ref; accomBook.appendChild(rf); }
+    if (e.accom_url) { var lk = document.createElement('a'); lk.className='accom-link'; lk.href=e.accom_url; lk.target='_blank'; lk.rel='noopener'; lk.textContent='🔗 Ver reserva'; accomBook.appendChild(lk); }
+    vm.appendChild(accomBook);
+  }
   body.appendChild(vm);
 
   // --- EDIT MODE ---
@@ -1256,6 +1339,20 @@ function buildCard(e, cityKey) {
   accomInp.oninput = function() { liveUpdate(cityKey, e.id, 'accom', this.value); };
   accomWrap.appendChild(accomWrapIc);
   accomWrap.appendChild(accomInp);
+  // Booking ref input
+  var accomRefInp = document.createElement('input');
+  accomRefInp.className = 'accom-sub-inp';
+  accomRefInp.placeholder = '# Referência de reserva (ex: ABC123456)';
+  accomRefInp.value = e.accom_ref || '';
+  accomRefInp.oninput = function() { liveUpdate(cityKey, e.id, 'accom_ref', this.value.trim()); };
+  accomWrap.appendChild(accomRefInp);
+  // Booking URL input
+  var accomUrlInp = document.createElement('input');
+  accomUrlInp.className = 'accom-sub-inp';
+  accomUrlInp.placeholder = '🔗 Link da reserva (https://...)';
+  accomUrlInp.value = e.accom_url || '';
+  accomUrlInp.oninput = function() { liveUpdate(cityKey, e.id, 'accom_url', this.value.trim()); };
+  accomWrap.appendChild(accomUrlInp);
   body.appendChild(accomWrap);
 
   // ── Costs view row (hidden when empty) ──────────────────────────────────
@@ -1432,6 +1529,14 @@ function refreshBudget() {
   var el=document.getElementById('stat-budget'); if(el) el.textContent=_fmt(total)+' €';
   var s=function(id,v){ var x=document.getElementById(id); if(x) x.textContent=_fmt(v)+' €'; };
   s('bd-travel',travel); s('bd-food',food); s('bd-accom',accom); s('bd-other',other); s('bd-total',total);
+  var n = N_TRAVELERS || 1;
+  s('bd-perperson', total / n);
+  var tc = document.getElementById('travelers-count'); if (tc) tc.textContent = n;
+}
+
+function changeTravelers(delta) {
+  N_TRAVELERS = Math.max(1, (N_TRAVELERS || 1) + delta);
+  refreshBudget();
 }
 // ── Render ─────────────────────────────────────────────────────────────────────
 function render() {
@@ -1542,14 +1647,30 @@ function buildTransportEntry(tKey, tData) {
   var el = document.createElement('div');
   el.className = 'transport-entry';
   var ic = document.createElement('span'); ic.className = 'te-icon'; ic.textContent = icon;
+  var info = document.createElement('div'); info.style.flex = '1'; info.style.minWidth = '0';
+  // Main label line
   var lbl = document.createElement('span'); lbl.className = 'te-label';
   var lbl_text = (labels[tData.type]||tData.type) + (tData.duration ? ' — ' + tData.duration : '');
   if (tData.cost) lbl_text += ' · ' + fmt(tData.cost) + ' €';
   if (tData.note) lbl_text += ' (' + tData.note + ')';
   lbl.textContent = lbl_text;
+  info.appendChild(lbl);
+  // Times line
+  if (tData.depart || tData.arrive) {
+    var times = document.createElement('div'); times.className = 'te-times';
+    times.textContent = (tData.depart || '--:--') + ' → ' + (tData.arrive || '--:--');
+    info.appendChild(times);
+  }
+  // Booking ref + link
+  if (tData.ref || tData.url) {
+    var bk = document.createElement('div'); bk.className = 'te-booking';
+    if (tData.ref) { var rf = document.createElement('span'); rf.textContent = '# ' + tData.ref; bk.appendChild(rf); }
+    if (tData.url) { var lk = document.createElement('a'); lk.href = tData.url; lk.target = '_blank'; lk.rel = 'noopener'; lk.textContent = '🔗 Ver bilhete'; bk.appendChild(lk); }
+    info.appendChild(bk);
+  }
   var del = document.createElement('button'); del.className = 'te-del'; del.textContent = '✕';
   del.onclick = (function(k){ return function(e){ e.stopPropagation(); deleteTransport(k); }; })(tKey);
-  el.appendChild(ic); el.appendChild(lbl); el.appendChild(del);
+  el.appendChild(ic); el.appendChild(info); el.appendChild(del);
   // Click entry to edit
   el.onclick = (function(k){ return function(ev){ if(ev.target.classList.contains('te-del')) return; openTransportModal(k); }; })(tKey);
   el.style.cursor = 'pointer';
@@ -1577,6 +1698,20 @@ function liveUpdate(cityKey, id, field, val) {
     if(field==='desc'){var _d=card.querySelectorAll('.vm-desc');for(var _di=0;_di<_d.length;_di++)_d[_di].textContent=val;}
     if (field === 'accom') {
       var _a2=card.querySelectorAll('.accom-txt');for(var _a2i=0;_a2i<_a2.length;_a2i++){_a2[_a2i].textContent=val||'Indica o alojamento...';_a2[_a2i].className='accom-txt'+(val?' set':'');}
+    }
+    if (field === 'accom_ref' || field === 'accom_url') {
+      // Rebuild booking info row in view mode
+      var _vm = card.querySelector('.vm');
+      if (_vm) {
+        var _old = _vm.querySelector('.accom-booking'); if (_old) _old.remove();
+        var _ref = e.accom_ref, _url = e.accom_url;
+        if (_ref || _url) {
+          var _bk = document.createElement('div'); _bk.className = 'accom-booking';
+          if (_ref) { var _rf = document.createElement('span'); _rf.className='accom-ref'; _rf.textContent='# '+_ref; _bk.appendChild(_rf); }
+          if (_url) { var _lk = document.createElement('a'); _lk.className='accom-link'; _lk.href=_url; _lk.target='_blank'; _lk.rel='noopener'; _lk.textContent='🔗 Ver reserva'; _bk.appendChild(_lk); }
+          var _ar = _vm.querySelector('.accom-row'); if (_ar) _ar.after(_bk);
+        }
+      }
     }
   }
   clearTimeout(saveTimer);
@@ -2416,6 +2551,7 @@ async function initApp() {
   restorePersistedPinPositions();
   render();
   refreshBudget();
+  refreshStatusStat();
   initMobileLayout();
   startPolling();
   startPresence();
@@ -2466,6 +2602,10 @@ function openTransportModal(tKey) {
   var existing = transports[tKey] || {};
   document.getElementById('t-type').value = existing.type || 'plane';
   document.getElementById('t-duration').value = existing.duration || '';
+  document.getElementById('t-depart').value = existing.depart || '';
+  document.getElementById('t-arrive').value = existing.arrive || '';
+  document.getElementById('t-ref').value = existing.ref || '';
+  document.getElementById('t-url').value = existing.url || '';
   document.getElementById('t-cost').value = existing.cost || '';
   document.getElementById('t-note').value = existing.note || '';
   document.getElementById('modal-transport').classList.add('open');
@@ -2479,9 +2619,17 @@ function saveTransportModal() {
   if (!pendingTransportKey) return;
   var tKey = pendingTransportKey;
   var costVal = parseFloat(document.getElementById('t-cost').value);
+  var tDepart = document.getElementById('t-depart').value.trim();
+  var tArrive = document.getElementById('t-arrive').value.trim();
+  var tRef    = document.getElementById('t-ref').value.trim();
+  var tUrl    = document.getElementById('t-url').value.trim();
   transports[tKey] = {
     type:     document.getElementById('t-type').value,
     duration: document.getElementById('t-duration').value.trim(),
+    depart:   tDepart || undefined,
+    arrive:   tArrive || undefined,
+    ref:      tRef    || undefined,
+    url:      tUrl    || undefined,
     cost:     isNaN(costVal) || costVal <= 0 ? undefined : costVal,
     note:     document.getElementById('t-note').value.trim()
   };
