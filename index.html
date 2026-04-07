@@ -68,8 +68,14 @@ body.editing .hl h1, body.editing .hl p { border-bottom:1px dashed rgba(160,120,
 .edit-btn:hover { border-color:var(--border-h); color:var(--text); }
 .edit-btn.on { border-color:var(--gold); color:var(--gold); background:var(--gold-bg); }
 .edit-btn .dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
-.export-btn { display:flex; align-items:center; gap:0.4rem; cursor:pointer; padding:0.36rem 0.85rem; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--text-m); font-family:'DM Sans',sans-serif; font-size:0.68rem; letter-spacing:0.07em; text-transform:uppercase; transition:all 0.18s; }
-.export-btn:hover { border-color:var(--gold); color:var(--gold); background:var(--gold-bg); }
+.more-btn { display:flex; align-items:center; justify-content:center; cursor:pointer; width:2rem; height:2rem; border-radius:50%; border:1px solid var(--border); background:transparent; color:var(--text-m); font-size:1.1rem; line-height:1; transition:all 0.18s; flex-shrink:0; }
+.more-btn:hover { border-color:var(--border-h); color:var(--text); }
+.more-wrap { position:relative; }
+.more-wrap.open .more-menu { display:block; }
+.more-menu { display:none; position:absolute; top:calc(100% + 6px); right:0; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,0.10); z-index:50; min-width:160px; padding:0.3rem 0; }
+.more-menu button { display:flex; align-items:center; gap:0.55rem; width:100%; padding:0.5rem 0.9rem; background:transparent; border:none; color:var(--text-m); font-family:'DM Sans',sans-serif; font-size:0.68rem; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; text-align:left; transition:background 0.15s, color 0.15s; white-space:nowrap; }
+.more-menu button:hover { background:var(--gold-bg); color:var(--gold); }
+.more-menu .menu-sep { border:none; border-top:1px solid var(--border); margin:0.25rem 0; }
 .cancel-edit-btn { display:none; align-items:center; cursor:pointer; padding:0.36rem 0.85rem; border-radius:20px; border:1px solid rgba(180,40,30,0.3); background:transparent; color:#b42820; font-family:'DM Sans',sans-serif; font-size:0.68rem; letter-spacing:0.07em; text-transform:uppercase; transition:all 0.18s; }
 .cancel-edit-btn:hover { background:#f5dcd8; }
 
@@ -331,7 +337,7 @@ body.editing .cost-add-row { display:flex; }
 .cost-add-btn:hover { background:var(--bg); color:var(--text-m); }
 /* Budget in header */
 .budget-wrap { position:relative; cursor:pointer; }
-.budget-breakdown { display:none; position:absolute; top:110%; right:0; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:0.65rem 0.9rem; min-width:175px; box-shadow:0 4px 16px rgba(0,0,0,0.1); z-index:50; font-size:0.61rem; }
+.budget-breakdown { display:none; position:absolute; top:110%; right:0; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:0.65rem 0.9rem; width:max-content; box-shadow:0 4px 16px rgba(0,0,0,0.1); z-index:50; font-size:0.61rem; }
 .budget-wrap.open .budget-breakdown { display:block; }
 .budget-line { display:flex; justify-content:space-between; gap:1rem; padding:2px 0; color:var(--text-m); white-space:nowrap; }
 .budget-line.total { border-top:1px solid var(--border); margin-top:4px; padding-top:5px; font-weight:500; color:var(--text); }
@@ -457,12 +463,13 @@ body.editing .insert-before-btn { display:block; }
     <button class="edit-btn" id="editBtn" onclick="toggleEdit()">
       <span class="dot"></span><span id="editLbl">Editar</span>
     </button>
-    <button class="export-btn" onclick="exportHTML()" title="Exportar HTML auto-contido com dados incluídos">
-      ↓ HTML
-    </button>
-    <button class="export-btn" onclick="exportJSON()" title="Guardar backup dos dados em JSON">
-      ↓ JSON
-    </button>
+    <div class="more-wrap" id="more-wrap">
+      <button class="more-btn" id="more-btn" title="Mais opções">⋯</button>
+      <div class="more-menu" id="more-menu">
+        <button onclick="exportHTML(); closeMoreMenu()">↓ Exportar HTML</button>
+        <button onclick="exportJSON(); closeMoreMenu()">↓ Guardar JSON</button>
+      </div>
+    </div>
 
   </div>
 </header>
@@ -2120,6 +2127,11 @@ function exportHTML() {
   }
 }
 
+function closeMoreMenu() {
+  var w = document.getElementById('more-wrap');
+  if (w) w.classList.remove('open');
+}
+
 function exportJSON() {
   var payload = { itin: data, transports: transports, cities: CITIES };
   var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
@@ -2285,6 +2297,19 @@ function startPresence() {
 
 // ── Budget breakdown toggle ───────────────────────────────────────────────────
 (function() {
+  function initMoreMenu() {
+    var wrap = document.getElementById('more-wrap');
+    var btn  = document.getElementById('more-btn');
+    if (!wrap || !btn) return;
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      wrap.classList.toggle('open');
+    });
+    document.addEventListener('click', function() {
+      wrap.classList.remove('open');
+    });
+  }
+
   function initBudget() {
     var wrap = document.getElementById('budget-wrap-el');
     if (!wrap) return;
@@ -2306,8 +2331,9 @@ function startPresence() {
     });
   }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initBudget);
+    document.addEventListener('DOMContentLoaded', function() { initMoreMenu(); initBudget(); });
   } else {
+    initMoreMenu();
     initBudget();
   }
 })();
