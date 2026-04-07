@@ -1575,10 +1575,12 @@ function render() {
     for(var _bi=0;_bi<city.entries.length;_bi++)sec.appendChild(buildCard(city.entries[_bi],key));
 
     if (city.entries.length === 0) {
-      var emptyHint = document.createElement('div');
-      emptyHint.className = 'city-empty-hint';
-      emptyHint.textContent = 'Usa "＋ dia a seguir" num dia adjacente para adicionar dias aqui.';
-      sec.appendChild(emptyHint);
+      // Auto-add a first day rather than showing a dead-end hint
+      var _autoEntry = { id:'u'+(uid++), day:'?', month:'', dow:'', title:city.label, desc:'', accom:'', special:false, tags:[], costs:{} };
+      city.entries.push(_autoEntry);
+      renumberAllDates();
+      persist();
+      sec.appendChild(buildCard(_autoEntry, key));
     }
 
     // "Add city here" button BEFORE this city section (between prev transport and this section)
@@ -2938,7 +2940,7 @@ function initMapDrag() {
     <input id="ac-name" placeholder="ex: Hué, Bangkok, Kuala Lumpur..." maxlength="40">
     <label style="margin-top:0.8rem">Inserir após</label>
     <select id="ac-after" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.76rem;padding:7px 9px;outline:none;"></select>
-    <p style="font-size:0.66rem;color:var(--text-d);margin-top:0.7rem;line-height:1.5">💡 O local começa vazio. Usa "＋ dia a seguir" nos dias adjacentes para adicionar dias, ou arrasta o pin no mapa para a posição certa.</p>
+    <p style="font-size:0.66rem;color:var(--text-d);margin-top:0.7rem;line-height:1.5">💡 Um primeiro dia é adicionado automaticamente. Podes adicionar mais dias com "＋ dia a seguir" e arrastar o pin no mapa para a posição certa.</p>
     <div class="mactions">
       <button class="mcancel" onclick="closeAddCityModal()">Cancelar</button>
       <button class="msave" onclick="saveAddCityModal()">Criar local</button>
