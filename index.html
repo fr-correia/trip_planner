@@ -46,6 +46,12 @@ body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif
 .login-box button:hover { background:#f5e8c0; }
 .login-error { font-size:0.65rem; color:#c43020; margin-top:0.5rem; min-height:1rem; }
 @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+/* Loading spinner (shown while data loads after login) */
+#app-loading { position:fixed; inset:0; background:var(--bg); z-index:9998; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; }
+#app-loading.hidden { display:none; }
+.spin-ring { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--gold); border-radius:50%; animation:spin 0.75s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-lbl { font-size:0.65rem; color:var(--text-d); letter-spacing:0.1em; text-transform:uppercase; }
 
 /* ── Presence indicators ── */
 .presence-wrap { display:flex; align-items:center; gap:0.6rem; }
@@ -377,6 +383,11 @@ body.editing .day-card .del-btn, body.editing .day-card .insert-before-btn { cur
 /* City day count badge */
 .city-day-count { font-size:0.58rem; color:var(--text-d); margin-left:0.4rem; font-weight:400; }
 .city-empty-hint { font-size:0.68rem; color:var(--text-d); padding:1rem 1.2rem; font-style:italic; border:1px dashed var(--border); border-radius:8px; margin:0.5rem 0.8rem; line-height:1.5; }
+/* Full itinerary empty state */
+.itinerary-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:4rem 2rem; gap:0.7rem; text-align:center; }
+.itinerary-empty .empty-icon { font-size:2.5rem; opacity:0.35; }
+.itinerary-empty .empty-title { font-family:'Playfair Display',serif; font-size:1.1rem; color:var(--text-m); }
+.itinerary-empty .empty-sub { font-size:0.68rem; color:var(--text-d); line-height:1.6; max-width:260px; }
 /* Status badge */
 .status-badge { display:inline-flex; align-items:center; gap:0.25rem; font-size:0.58rem; font-family:'DM Sans',sans-serif; letter-spacing:0.06em; text-transform:uppercase; padding:0.18rem 0.55rem; border-radius:20px; border:1px solid transparent; cursor:pointer; user-select:none; transition:all 0.15s; margin-bottom:0.35rem; }
 .status-badge.none  { background:var(--bg); border-color:var(--border); color:var(--text-d); }
@@ -448,6 +459,11 @@ body.editing .insert-before-btn { display:block; }
 </style>
 </head>
 <body class="">
+
+<div id="app-loading" class="hidden">
+  <div class="spin-ring"></div>
+  <div class="loading-lbl">A carregar…</div>
+</div>
 
 <div id="login-screen">
   <div class="login-box">
@@ -616,6 +632,20 @@ Tarde: Santuário de My Son. Noite: lanternas no rio Thu Bon.</textarea><div cla
 <script>
 var CITIES = ['hanoi','halong','danang','hoian','hcmc','singapore'];
 var N_TRAVELERS = 2;
+
+// ── Trip year config ──────────────────────────────────────────────────────────
+// Year when the trip STARTS (used by dateFromEntry to assign the correct year
+// to each month — months before the start month are assumed to be in the
+// following year). Update this if you create a new trip.
+var TRIP_YEAR_START = (function() {
+  // Try to parse from the header subtitle (e.g. "Nov/Dez 2025" → 2025)
+  var sub = document.getElementById('hdr-sub');
+  if (sub) {
+    var m = sub.textContent.match(/\b(20\d{2})\b/);
+    if (m) return parseInt(m[1], 10);
+  }
+  return new Date().getFullYear();
+})();
 
 // Palette for dynamically-created cities (cycles through these)
 var CITY_PALETTE = [
@@ -1167,13 +1197,25 @@ function restorePersistedPinPositions() {
 }
 function refreshStatusStat() {
   var pending = 0;
-  CITIES.forEach(function(k){ (data[k].entries||[]).forEach(function(e){ if (!e.status || e.status === 'none') pending++; }); });
+  CITIES.forEach(function(k){
+    if (!data[k] || !Array.isArray(data[k].entries)) return;
+    data[k].entries.forEach(function(e){ if (!e.status || e.status === 'none') pending++; });
+  });
   var el = document.getElementById('stat-pending'); if (el) el.textContent = pending;
 }
 
 function refreshAccomStat() {
   var seen = 0;
-  for(var _ri=0;_ri<CITIES.length;_ri++){var _re=data[CITIES[_ri]].entries;for(var _rj=0;_rj<_re.length;_rj++){var acc=_re[_rj].accom&&_re[_rj].accom.trim();if(!acc)continue;if(_rj>0&&_re[_rj-1].accom&&_re[_rj-1].accom.trim()===acc)continue;seen++;}}
+  for (var _ri = 0; _ri < CITIES.length; _ri++) {
+    if (!data[CITIES[_ri]] || !Array.isArray(data[CITIES[_ri]].entries)) continue;
+    var _re = data[CITIES[_ri]].entries;
+    for (var _rj = 0; _rj < _re.length; _rj++) {
+      var acc = _re[_rj].accom && _re[_rj].accom.trim();
+      if (!acc) continue;
+      if (_rj > 0 && _re[_rj-1].accom && _re[_rj-1].accom.trim() === acc) continue;
+      seen++;
+    }
+  }
   document.getElementById('stat-accom').textContent = seen;
 }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -1234,7 +1276,7 @@ function buildCard(e, cityKey) {
 
   // Drag to reorder
   initDrag(card, cityKey, e.id);
-  if (editMode) card.draggable = true;
+  if (editMode) { card.draggable = true; card.title = 'Arrasta para reordenar'; }
 
   // Date column
   var dnum = document.createElement('div');
@@ -1631,10 +1673,18 @@ function render() {
       wrap.appendChild(tDiv);
     }
   })(CITIES[_ki]);}
+  // Empty state when there are no cities yet
+  if (CITIES.length === 0) {
+    var emptyDiv = document.createElement('div');
+    emptyDiv.className = 'itinerary-empty';
+    emptyDiv.innerHTML = '<div class="empty-icon">🗺</div><div class="empty-title">Itinerário vazio</div><div class="empty-sub">Ativa o modo Editar e adiciona o primeiro local da viagem.</div>';
+    wrap.appendChild(emptyDiv);
+  }
+
   // "Add city at end" button after the last city
   var addCityEnd = document.createElement('button');
   addCityEnd.className = 'add-city-btn';
-  addCityEnd.textContent = '＋ Adicionar local no fim';
+  addCityEnd.textContent = CITIES.length === 0 ? '＋ Adicionar primeiro local' : '＋ Adicionar local no fim';
   addCityEnd.onclick = function() {
     openAddCityModal(CITIES[CITIES.length - 1]);
   };
@@ -1847,11 +1897,16 @@ function toggleEdit() {
   document.getElementById('cancelEditBtn').style.display = editMode ? 'flex' : 'none';
   setHeaderEditable(editMode);
   // Enable/disable drag on all cards
-  document.querySelectorAll('.day-card').forEach(function(card){ card.draggable = editMode; });
+  document.querySelectorAll('.day-card').forEach(function(card){
+    card.draggable = editMode;
+    card.title = editMode ? 'Arrasta para reordenar' : '';
+  });
 }
 
-function cancelEdit() {
-  clearTimeout(saveTimer); // cancel any pending liveUpdate saves before restoring snapshot
+function _doCancel() {
+  clearTimeout(saveTimer);
+  clearTimeout(_saveDebounce); // also cancel any in-flight persist debounce
+  _saveDebounce = null;
   if (dataSnapshot) { data = dataSnapshot; dataSnapshot = null; persist(); }
   editMode = false;
   document.body.classList.remove('editing');
@@ -1860,6 +1915,11 @@ function cancelEdit() {
   document.getElementById('cancelEditBtn').style.display = 'none';
   setHeaderEditable(false);
   render();
+}
+
+function cancelEdit() {
+  if (!dataSnapshot) { _doCancel(); return; }
+  showConfirm('Descartar todas as alterações?', _doCancel);
 }
 
 // ── Add city modal ────────────────────────────────────────────────────────────
@@ -2105,6 +2165,14 @@ function initDrag(card, cityKey, entryId) {
       return null;
     })();
 
+    // Guard: source/target city may have been deleted remotely
+    if (!data[_dragSrcCity] || !data[_dragSrcCity].entries) {
+      showToast('Erro: local de origem não existe'); _dragSrcCity = null; _dragSrcId = null; return;
+    }
+    if (!data[cityKey] || !data[cityKey].entries) {
+      showToast('Erro: local de destino não existe'); _dragSrcCity = null; _dragSrcId = null; return;
+    }
+
     // Find source entry and remove it
     var srcEntry = null;
     var srcEntries = data[_dragSrcCity].entries;
@@ -2130,7 +2198,7 @@ function initDrag(card, cityKey, entryId) {
     if (editMode) {
       document.body.classList.add('editing');
       // Re-enable drag on all cards
-      document.querySelectorAll('.day-card').forEach(function(c){ c.draggable = true; });
+      document.querySelectorAll('.day-card').forEach(function(c){ c.draggable = true; c.title = 'Arrasta para reordenar'; });
     }
     showToast('Dia movido ✓');
     _dragSrcCity = null; _dragSrcId = null;
@@ -2141,12 +2209,29 @@ function initDrag(card, cityKey, entryId) {
 var PT_MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 var PT_DOWS   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
+// TRIP_START_MONTH: index (0-11) of the first month of the trip.
+// Computed once from all entries; months >= this → TRIP_YEAR_START, else +1 year.
+var TRIP_START_MONTH = 10; // fallback: October
+function _computeTripStartMonth() {
+  var mn = {'Jan':0,'Fev':1,'Mar':2,'Abr':3,'Mai':4,'Jun':5,'Jul':6,'Ago':7,'Set':8,'Out':9,'Nov':10,'Dez':11};
+  var earliest = 11;
+  CITIES.forEach(function(k) {
+    if (!data[k] || !data[k].entries) return;
+    data[k].entries.forEach(function(e) {
+      var m = mn[e.month];
+      if (m !== undefined && m < earliest) earliest = m;
+    });
+  });
+  TRIP_START_MONTH = earliest;
+}
+
 function dateFromEntry(e) {
   var monthNames = {'Jan':0,'Fev':1,'Mar':2,'Abr':3,'Mai':4,'Jun':5,'Jul':6,'Ago':7,'Set':8,'Out':9,'Nov':10,'Dez':11};
   var d = parseInt(e.day, 10);
   var m = monthNames[e.month];
   if (isNaN(d) || m === undefined) return null;
-  var yr = (m >= 10) ? 2025 : 2026;
+  // Months in the starting half of the trip → TRIP_YEAR_START; wrap-around → +1
+  var yr = (m >= TRIP_START_MONTH) ? TRIP_YEAR_START : TRIP_YEAR_START + 1;
   return new Date(yr, m, d);
 }
 
@@ -2154,6 +2239,7 @@ function getAllEntriesInOrder() {
   var result = [];
   for (var ci = 0; ci < CITIES.length; ci++) {
     var key = CITIES[ci];
+    if (!data[key] || !Array.isArray(data[key].entries)) continue;
     var entries = data[key].entries;
     for (var ei = 0; ei < entries.length; ei++) {
       result.push({ cityKey: key, entry: entries[ei] });
@@ -2361,9 +2447,12 @@ function exportHTML() {
     'var transports = ' + transportsJSON + ';'
   );
   var blob = new Blob([exported], { type: 'text/html;charset=utf-8' });
+  var _htitle = (data._headerTitle || document.getElementById('hdr-title').textContent || 'itinerario')
+    .toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+  var _hfilename = _htitle + '.html';
   if (window.showSaveFilePicker) {
     window.showSaveFilePicker({
-      suggestedName: 'itinerario_vietname.html',
+      suggestedName: _hfilename,
       types: [{ description: 'Página HTML', accept: { 'text/html': ['.html'] } }]
     }).then(function(fh){ return fh.createWritable(); })
       .then(function(w){ return w.write(blob).then(function(){ return w.close(); }); })
@@ -2371,7 +2460,7 @@ function exportHTML() {
   } else {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url; a.download = 'itinerario_vietname.html';
+    a.href = url; a.download = _hfilename;
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
   }
@@ -2430,7 +2519,9 @@ window.addEventListener('load', function() { initMobileLayout(); initPinPosition
 
 // Ensure DOM is ready before rendering (Safari sometimes needs this)
 // ── Auth & Presence ───────────────────────────────────────────────────────────
-var USERS = { 'Francisco': 'Sofia95', 'Cátia': 'Sofia95' };
+// Passwords stored as base64 to avoid plaintext in source (not cryptographic security,
+// just prevents casual inspection). To update: btoa('yourpassword')
+var USERS = { 'Francisco': atob('U29maWE5NQ=='), 'Cátia': atob('U29maWE5NQ==') };
 var ALL_USERS = ['Francisco', 'Cátia'];
 var _SESSION_USER = null;
 var _presenceInterval = null;
@@ -2462,6 +2553,7 @@ function tryLogin() {
     _SESSION_USER = matchedUser;
     try { sessionStorage.setItem('vn_user', matchedUser); } catch(e) {}
     document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app-loading').classList.remove('hidden');
     initApp();
   } else {
     err.textContent = !matchedUser ? 'Nome não reconhecido' : 'Password incorrecta';
@@ -2607,9 +2699,11 @@ async function initApp() {
     });
   }
   restorePersistedPinPositions();
+  _computeTripStartMonth(); // derive trip start month from loaded data
   render();
   refreshBudget();
   refreshStatusStat();
+  document.getElementById('app-loading').classList.add('hidden');
   initMobileLayout();
   startPolling();
   startPresence();
@@ -2618,6 +2712,7 @@ async function initApp() {
 function startApp() {
   if (checkLogin()) {
     document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app-loading').classList.remove('hidden');
     initApp();
   } else {
     setTimeout(function(){ document.getElementById('login-user').focus(); }, 100);
