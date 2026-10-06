@@ -91,15 +91,6 @@ var PIN_CY = { cidade1: 108, cidade2: 109 };
 
 Lista de valores atualmente hardcoded no `index.html` que podem precisar de ser alterados:
 
-### Credenciais e autenticação
-
-| Linha | Parâmetro | Valor atual |
-|-------|-----------|-------------|
-| 967 | `SUPA_URL` | `https://dhvvdbfjqeuoewtqnvqq.supabase.co` |
-| 968 | `SUPA_KEY` | `sb_publishable_bvwHu05NfTKZNlQUa7VHuw_Q4OzE87Q` |
-| 2147 | `USERS` | `{ 'Francisco': 'Sofia95', 'Cátia': 'Sofia95' }` |
-| 2156 | session key | `'vn_user'` |
-
 ### Conteúdo da viagem
 
 | Linha | Parâmetro | Valor atual |
